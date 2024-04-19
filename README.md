@@ -1,56 +1,229 @@
-<img width="870" alt="image" src="https://github.com/partykit/partykit/assets/18808/485d32ff-cbee-4b03-8673-c594200774a2">
+# PartySocket
 
-![npm beta](https://img.shields.io/npm/v/partykit)
-[![Discord](https://img.shields.io/discord/1051830863576453180?color=7289DA&logo=discord&logoColor=white)](https://discord.gg/g5uqHQJc3z)
-![License](https://img.shields.io/github/license/partykit/partykit)
+_(Forked from the wonderful [reconnecting-websocket](https://github.com/joewalnes/reconnecting-websocket/) project, updated with pending PRs and bugfixes)_
 
-[PartyKit](https://partykit.io/) simplifies developing multiplayer applications.
+A better WebSocket that Just Works™
 
-With PartyKit, you can focus on building multiplayer apps or adding real-time experiences to your existing projects with as little as one line of code. Meanwhile, PartyKit will handle operational complexity and real-time infrastructure scaling.
+## Install
 
-## Documentation
-
-Go to [docs.partykit.io](https://docs.partykit.io) for documentation, guides and examples.
-
-## Quick start
-
-Note: to run PartyKit, you need to have Node v. 17 or higher installed.
-
-You can create a PartyKit project by running:
-
-```sh
-npm create partykit@latest
+```bash
+npm install partysocket
 ```
 
-This will ask a few questions about your project and create a new directory with a PartyKit application, that includes a server and a client.
+## Features
 
-Alternatively, you can add PartyKit to your existing project using the following command in the project's root directory:
+- WebSocket API compatible (same interface, Level0 and Level2 event model)
+- Reconnects when a connection drops
+- Buffers messages when not connected, and sends accumulated messages when open
+- Handle connection timeouts
+- Allows changing server URL between reconnections
+- Fully configurable
+- Multi-platform (Web, ServiceWorkers, Node.js, React Native, Cloudflare Workers, Deno, Bun)
+- Dependency free (does not depend on Window, DOM or any EventEmitter library)
+- Debug mode
+- Works everywhere, not just with PartyKit!
 
-```sh
-npx partykit@latest init
+## Usage
+
+### Compatible with WebSocket Browser API
+
+[MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).
+
+### Simple usage
+
+```javascript
+import { WebSocket } from "partysocket";
+
+const ws = new WebSocket("wss://my.site.com");
+
+ws.addEventListener("open", () => {
+  ws.send("hello!");
+});
 ```
 
-From inside the directory, you can then run `npm run dev` to start the development server. When you're ready, you can deploy your application on to the PartyKit cloud with `npm run deploy`.
+### Usage with PartyKit
 
-## Developers
+```javascript
+import PartySocket from "partysocket";
 
-- [Documentation](https://docs.partykit.io/) - [`/apps/docs`](./apps/docs)
-- [Examples](https://docs.partykit.io/examples) - [`/apps/docs/src/content/docs/examples`](./apps/docs/src/content/docs/examples)
-- [API References](https://docs.partykit.io/reference/) - [`./apps/docs/src/content/docs/reference`](./apps/docs/src/content/docs/reference)
-- [Guides](https://docs.partykit.io/guides) - [`./apps/docs/src/content/docs/guides`](./apps/docs/src/content/docs/guides)
-- [Release Notes](https://github.com/partykit/partykit/releases)
-- [Blog](https://blog.partykit.io/) - [`/apps/blog`](./apps/blog)
+// optional: only needed if creating using inside node.js. Run `npm install ws`, and then add:
+// import WS from "ws";
 
-## Community and support
+const ws = new PartySocket({
+  host: "project.name.partykit.dev", // or localhost:1999 in dev
+  room: "my-room",
+  // add an optional id to identify the client,
+  // if not provided, a random id will be generated
+  id: "some-connection-id"
+  // optional: if used from node.js, you need to pass the WebSocket polyfill imported from `ws`
+  // WebSocket: WS
+});
 
-- [GitHub issues](./issues) to report bugs 🐛
-- [Discord](https://discord.gg/vwDWs68C) to ask questions, share your ideas and feedback, and help us celebrate your PartyKit projects 💕
-- [Twitter](https://x.com/partykit_io) to say "hi" and get the freshest updates!
+// optionally, update the properties of the connection
+// (e.g. to change the host or room)
+ws.updateProperties({
+  host: "another-project.username.partykit.dev",
+  room: "my-new-room"
+});
 
-## Contributing
+ws.reconnect(); // make sure to call reconnect() after updating the properties
+```
 
-We encourage contributions to PartyKit. If you're interested in contributing or need help or have questions, please join us in our [Discord](https://discord.gg/g5uqHQJc3z).
+### Update URL
+
+The `url` parameter will be resolved before connecting, with possible types:
+
+- `string`
+- `() => string`
+- `() => Promise<string>`
+
+```javascript
+import { WebSocket } from "partysocket";
+
+const urls = [
+  "wss://my.site.com",
+  "wss://your.site.com",
+  "wss://their.site.com"
+];
+let urlIndex = 0;
+
+// round robin url provider
+const urlProvider = () => urls[urlIndex++ % urls.length];
+
+const ws = new WebSocket(urlProvider);
+```
+
+```javascript
+import { WebSocket } from "partysocket";
+
+// async url provider
+const urlProvider = async () => {
+  const token = await getSessionToken();
+  return `wss://my.site.com/${token}`;
+};
+
+const ws = new WebSocket(urlProvider);
+```
+
+### Update Protocols
+
+The `protocols` parameter will be resolved before connecting, possible types:
+
+- `null`
+- `string`
+- `string[]`
+- `() => string | string[] | null`
+- `() => Promise<string | string[] | null>`
+
+```javascript
+import { WebSocket } from "partysocket";
+
+const ws = new WebSocket("wss://your.site.com", "your protocol");
+```
+
+```javascript
+import WebSocket from 'partysocket`;
+
+const protocols = ['p1', 'p2', ['p3.1', 'p3.2']];
+let protocolsIndex = 0;
+
+// round robin protocols provider
+const protocolsProvider = () => protocols[protocolsIndex++ % protocols.length];
+
+const ws = new WebSocket('wss://your.site.com', protocolsProvider);
+```
+
+### Options
+
+#### Sample with custom options
+
+```javascript
+import { WebSocket } from "partysocket";
+import WS from "ws";
+
+const options = {
+  WebSocket: WS, // custom WebSocket constructor
+  connectionTimeout: 1000,
+  maxRetries: 10
+};
+const ws = new WebSocket("wss://my.site.com", [], options);
+```
+
+#### Available options
+
+```typescript
+type Options = {
+  WebSocket?: any; // WebSocket constructor, if none provided, defaults to global WebSocket
+  maxReconnectionDelay?: number; // max delay in ms between reconnections
+  minReconnectionDelay?: number; // min delay in ms between reconnections
+  reconnectionDelayGrowFactor?: number; // how fast the reconnection delay grows
+  minUptime?: number; // min time in ms to consider connection as stable
+  connectionTimeout?: number; // retry connect if not connected after this time, in ms
+  maxRetries?: number; // maximum number of retries
+  maxEnqueuedMessages?: number; // maximum number of messages to buffer until reconnection
+  startClosed?: boolean; // start websocket in CLOSED state, call `.reconnect()` to connect
+  debug?: boolean; // enables debug output
+};
+```
+
+#### Default values
+
+```javascript
+WebSocket: undefined,
+maxReconnectionDelay: 10000,
+minReconnectionDelay: 1000 + Math.random() * 4000,
+reconnectionDelayGrowFactor: 1.3,
+minUptime: 5000,
+connectionTimeout: 4000,
+maxRetries: Infinity,
+maxEnqueuedMessages: Infinity,
+startClosed: false,
+debug: false,
+```
+
+## API
+
+### Methods
+
+```typescript
+constructor(url: UrlProvider, protocols?: ProtocolsProvider, options?: Options)
+
+close(code?: number, reason?: string)
+reconnect(code?: number, reason?: string)
+
+send(data: string | ArrayBuffer | Blob | ArrayBufferView)
+
+addEventListener(type: 'open' | 'close' | 'message' | 'error', listener: EventListener)
+removeEventListener(type:  'open' | 'close' | 'message' | 'error', listener: EventListener)
+```
+
+### Attributes
+
+[More info](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
+
+```typescript
+binaryType: string;
+bufferedAmount: number;
+extensions: string;
+onclose: EventListener;
+onerror: EventListener;
+onmessage: EventListener;
+onopen: EventListener;
+protocol: string;
+readyState: number;
+url: string;
+retryCount: number;
+```
+
+### Constants
+
+```text
+CONNECTING 0 The connection is not yet open.
+OPEN       1 The connection is open and ready to communicate.
+CLOSING    2 The connection is in the process of closing.
+CLOSED     3 The connection is closed or couldn't be opened.
+```
 
 ## License
 
-PartyKit is [MIT licensed](./LICENSE).
+MIT

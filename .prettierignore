@@ -1,6 +1,0 @@
-*.mdx
-.astro
-*.gltf
-
-packages/partykit/schema.json
-apps/site/public/schema.json

@@ -1,6 +1,0 @@
-{
-  "name": "partymix-example",
-  "main": "dist/index.js",
-  "compatibilityDate": "2023-09-28",
-  "serve": "public"
-}

@@ -1,8 +1,0 @@
-{
-  "name": "partykit-site",
-  "main": "party/server.ts",
-  "compatibilityDate": "2023-11-13",
-  "parties": {
-    "presence": "party/presence.ts"
-  }
-}
